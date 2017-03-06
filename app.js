@@ -9,12 +9,12 @@ app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 
 app.get('*', (req, res, next) => {
-  console.log('[GET]', req.url, req.body, req.params);
+  console.log('[GET]', req.url, req.body, req.query);
   next();
 });
 
 app.post('*', (req, res, next) => {
-  console.log('[POST]', req.url, req.body, req.params);
+  console.log('[POST]', req.url, req.body, req.query);
   next();
 });
 
@@ -52,7 +52,7 @@ app.delete('/requests', (req, res, next) => {
 
 app.get('/torrents', (req, res, next) => {
   // Get the `q` query-string parameter from the URL (e.g., `/torrents?q=big+buck+bunny`).
-  var q = req.params.q;
+  var q = req.query.q;
 
   if (q in cache.pb) {
     // If we found a cached JSON blob for the search term, then
