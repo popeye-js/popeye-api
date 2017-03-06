@@ -22,6 +22,34 @@ var cache = {
   pb: {}
 };
 
+var db = {
+  requests: []
+};
+
+app.get('/', (req, res, next) => {
+  res.send({
+    status: 'ok'
+  });
+});
+
+app.get('/requests', (req, res, next) => {
+  res.send(db.requests);
+});
+
+app.post('/requests', (req, res, next) => {
+  if (req.body) {
+    db.requests.push(req.body);
+    res.send({success: true});
+    return;
+  }
+  res.send({success: false});
+});
+
+app.delete('/requests', (req, res, next) => {
+  db.requests = [];
+  res.send({success: true});
+});
+
 app.get('/torrents', (req, res, next) => {
   // Get the `q` query-string parameter from the URL (e.g., `/torrents?q=big+buck+bunny`).
   var q = req.params.q;
