@@ -1,0 +1,43 @@
+{
+  "name": "popeye-api",
+  "version": "0.1.0",
+  "main": "js/main.js",
+  "description": "REST API for Popeye voice controls.",
+  "browser": "js/main.js",
+  "scripts": {
+    "start": "npm run dev",
+    "dev": "cross-env NODE_ENV='development' nodemon ./app.js",
+    "prod": "cross-env NODE_ENV='production' node ./app.js",
+    "open": "opn 'https://popeye-api.herokuapp.com/'"
+  },
+  "dependencies": {
+    "body-parser": "^1.17.0",
+    "cross-env": "^3.2.3",
+    "express": "^4.15.1"
+  },
+  "devDependencies": {
+    "nodemon": "^1.11.0",
+    "opn-cli": "^3.1.0",
+    "request-promise": "^4.1.1"
+  },
+  "engines": {
+    "node": "6.9.1"
+  },
+  "repository": "popeye-js/popeye-js.github.io",
+  "keywords": [
+    "popeye",
+    "popeye-js",
+    "voice",
+    "voice-control",
+    "voice-controls",
+    "voice-command",
+    "voice-commands",
+    "voice-recognition",
+    "speech",
+    "speech-control",
+    "speech-controls",
+    "speech-synthesis",
+    "speech-recognition",
+    "browser"
+  ]
+}
