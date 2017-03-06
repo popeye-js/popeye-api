@@ -5,6 +5,12 @@ REST API for [Popeye voice controls](https://popeye-js.github.io/).
 
 ## Local installation
 
+First, clone this git repository:
+
+```sh
+git clone git@github.com:popeye-js/popeye-api.git
+```
+
 ### [Heroku](https://heroku.com)
 
 1. Create a [Heroku account](https://signup.heroku.com/), if you don't already have one.
@@ -18,12 +24,6 @@ REST API for [Popeye voice controls](https://popeye-js.github.io/).
     heroku git:remote -a popeye-api
     ```
 6. To deploy to Heroku manually, run `git push heroku master`. (The app will be automatically deployed to Heroku upon pushing to the upstream repository on GitHub, but you can still always trigger deploys manually.)
-
-First, clone this git repository:
-
-```sh
-git clone git@github.com:popeye-js/popeye-api.git
-```
 
 ### Node
 
