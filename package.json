@@ -8,7 +8,8 @@
     "start": "npm run dev",
     "dev": "cross-env NODE_ENV='development' nodemon ./app.js",
     "prod": "cross-env NODE_ENV='production' node ./app.js",
-    "open": "opn 'https://popeye-api.herokuapp.com/'"
+    "open": "opn 'https://popeye-api.herokuapp.com/'",
+    "deploy": "git push heroku master"
   },
   "dependencies": {
     "body-parser": "^1.17.0",
