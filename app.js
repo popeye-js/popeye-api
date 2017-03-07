@@ -2,6 +2,9 @@ var bodyParser = require('body-parser');
 var express = require('express');
 var PirateBay = require('thepiratebay');
 
+const TorrentNameParser = require('torrent-name-parse');
+const parser = new TorrentNameParser();
+
 var PORT = process.env.PORT || 7001;
 
 var app = express();
@@ -34,6 +37,7 @@ app.get('/', (req, res, next) => {
 
 app.get('/requests', (req, res, next) => {
   res.send(db.requests);
+
 });
 
 app.post('/requests', (req, res, next) => {
@@ -75,6 +79,35 @@ app.get('/torrents', (req, res, next) => {
     })
   });
 });
+
+// Get the latest episode - Assumes top seeded torrent is the latest episode
+app.get('/latestEpisode', (req, res, next) => {
+  var show = req.query.show;
+
+  var key = ('/latestEpisode/'+show);
+  if ( key in cache.pb) {
+    res.send(cache.pb[key]);
+  }
+
+  PirateBay.search(show, {}).then(results => {
+    var name = results[0]['name'];
+
+    var torrentData = parser.parse(name);
+    torrentData['magnetLink']=results[0]['magnetLink'];
+
+    cache.pb[key] = torrentData;  // Update the cached entry.
+    res.send(torrentData);  // Send the JSON blob.
+  }).catch(err => {
+    if (!err || !err.message) {
+      error = new Error('Unknown error occurred');
+    }
+    console.error(err);
+    res.send({
+      error: err.message
+    })
+  });
+
+})
 
 app.listen(PORT, () => {
   console.log('Listening on port %s', PORT);
