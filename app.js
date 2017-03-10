@@ -96,6 +96,7 @@ app.get('/latestEpisode', (req, res, next) => {
     torrentData['magnetLink']=results[0]['magnetLink'];
 
     cache.pb[key] = torrentData;  // Update the cached entry.
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.send(torrentData);  // Send the JSON blob.
   }).catch(err => {
     if (!err || !err.message) {
