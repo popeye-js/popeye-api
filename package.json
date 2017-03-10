@@ -16,6 +16,7 @@
     "cors": "^2.8.1",
     "cross-env": "^3.2.3",
     "express": "^4.15.1",
+    "request": "^2.81.0",
     "thepiratebay": "^1.3.3",
     "torrent-name-parse": "^1.1.0"
   },
