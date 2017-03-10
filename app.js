@@ -1,5 +1,6 @@
 var bodyParser = require('body-parser');
 var express = require('express');
+var cors = require("cors");
 var PirateBay = require('thepiratebay');
 
 const TorrentNameParser = require('torrent-name-parse');
@@ -10,6 +11,7 @@ var PORT = process.env.PORT || 7001;
 var app = express();
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
+app.use(cors()); // cors enablement for all routes
 
 app.get('*', (req, res, next) => {
   console.log('[GET]', req.url, req.body, req.query);
@@ -96,7 +98,6 @@ app.get('/latestEpisode', (req, res, next) => {
     torrentData['magnetLink']=results[0]['magnetLink'];
 
     cache.pb[key] = torrentData;  // Update the cached entry.
-    res.setHeader('Access-Control-Allow-Origin', '*');
     res.send(torrentData);  // Send the JSON blob.
   }).catch(err => {
     if (!err || !err.message) {
