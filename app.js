@@ -3,13 +3,20 @@ var express = require('express');
 var cors = require("cors");
 var PirateBay = require('thepiratebay');
 
+var request = require('request');
+
 const TorrentNameParser = require('torrent-name-parse');
 const parser = new TorrentNameParser();
+
+const imdb = require('imdb-api');
+const tv = require('tvdb.js')('7578D990905EA100');
 
 var PORT = process.env.PORT || 7001;
 
 var app = express();
-app.use(bodyParser.urlencoded({extended: true}));
+app.use(bodyParser.urlencoded({
+  extended: true
+}));
 app.use(bodyParser.json());
 app.use(cors()); // cors enablement for all routes
 
@@ -45,15 +52,21 @@ app.get('/requests', (req, res, next) => {
 app.post('/requests', (req, res, next) => {
   if (req.body) {
     db.requests.push(req.body);
-    res.send({success: true});
+    res.send({
+      success: true
+    });
     return;
   }
-  res.send({success: false});
+  res.send({
+    success: false
+  });
 });
 
 app.delete('/requests', (req, res, next) => {
   db.requests = [];
-  res.send({success: true});
+  res.send({
+    success: true
+  });
 });
 
 app.get('/torrents', (req, res, next) => {
@@ -69,8 +82,8 @@ app.get('/torrents', (req, res, next) => {
   }
 
   PirateBay.search(q, {}).then(results => {
-    cache.pb[q] = results;  // Update the cached entry.
-    res.send(results);  // Send the JSON blob.
+    cache.pb[q] = results; // Update the cached entry.
+    res.send(results); // Send the JSON blob.
   }).catch(err => {
     if (!err || !err.message) {
       error = new Error('Unknown error occurred');
@@ -86,19 +99,46 @@ app.get('/torrents', (req, res, next) => {
 app.get('/latestEpisode', (req, res, next) => {
   var show = req.query.show;
 
-  var key = ('/latestEpisode/'+show);
-  if ( key in cache.pb) {
+  var key = ('/latestEpisode/' + show);
+  if (key in cache.pb) {
     res.send(cache.pb[key]);
   }
 
-  PirateBay.search(show, {}).then(results => {
-    var name = results[0]['name'];
+  imdb.get(show).then(function(data) {
 
-    var torrentData = parser.parse(name);
-    torrentData['magnetLink']=results[0]['magnetLink'];
+    var url = "https://tv-v2.api-fetch.website/show/" + data.imdbid;
+    request(url, function(error, response, body) {
 
-    cache.pb[key] = torrentData;  // Update the cached entry.
-    res.send(torrentData);  // Send the JSON blob.
+      body = JSON.parse(body);
+
+      // get episodes of the current or latest season.
+      var num_seasons = body.num_seasons;
+      var currSeason = [];
+      body.episodes.forEach(function(episode) {
+        if (episode.season == num_seasons) {
+          currSeason.push(episode);
+        }
+      });
+
+      // find the latest episode
+      var highestEp = 0;
+      var index = 0;
+      for (var i = 0; i < currSeason.length; i++) {
+        if (currSeason[i]['episode'] > highestEp) {
+          highestEp = currSeason[i]['episode'];
+          index = i;
+        }
+      }
+
+      var magnetLink = currSeason[index].torrents['0']['url'];
+
+      var torrentData = {};
+      torrentData['magnetLink'] = magnetLink;
+
+      cache.pb[key] = torrentData; // Update the cached entry.
+      res.send(torrentData); // Send the JSON blob.
+    });
+
   }).catch(err => {
     if (!err || !err.message) {
       error = new Error('Unknown error occurred');
@@ -108,6 +148,24 @@ app.get('/latestEpisode', (req, res, next) => {
       error: err.message
     })
   });
+
+  // PirateBay.search(show, {}).then(results => {
+  //   var name = results[0]['name'];
+  //
+  //   var torrentData = parser.parse(name);
+  //   torrentData['magnetLink']=results[0]['magnetLink'];
+  //
+  //   cache.pb[key] = torrentData;  // Update the cached entry.
+  //   res.send(torrentData);  // Send the JSON blob.
+  // }).catch(err => {
+  //   if (!err || !err.message) {
+  //     error = new Error('Unknown error occurred');
+  //   }
+  //   console.error(err);
+  //   res.send({
+  //     error: err.message
+  //   })
+  // });
 
 })
 
