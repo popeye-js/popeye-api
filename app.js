@@ -95,7 +95,42 @@ app.get('/torrents', (req, res, next) => {
   });
 });
 
-// Get the latest episode - Assumes top seeded torrent is the latest episode
+app.get('/movie', (req, res, next) => {
+  var name = req.query.name;
+
+  var key = '/movie/' + name;
+  if (key in cache.pb) {
+    res.send(cache.pb[key]);
+  };
+
+  imdb.get(name).then(function(data) {
+
+    var url = "https://tv-v2.api-fetch.website/movie/" + data.imdbid;
+    request(url, function(error, response, body) {
+
+      body = JSON.parse(body);
+
+      var magnetLink = body.torrents.en['720p']['url'];
+
+      var torrentData = {};
+      torrentData['magnetLink'] = magnetLink;
+
+      cache.pb[key] = torrentData; // Update the cached entry.
+      res.send(torrentData); // Send the JSON blob.
+    });
+
+  }).catch(err => {
+    if (!err || !err.message) {
+      error = new Error('Unknown error occurred while fetching movie');
+    }
+    console.error(err);
+    res.send({
+      error: err.message
+    });
+  });
+});
+
+// Get the latest episode
 app.get('/latestEpisode', (req, res, next) => {
   var show = req.query.show;
 
