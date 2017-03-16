@@ -4,12 +4,9 @@ var cors = require("cors");
 var PirateBay = require('thepiratebay');
 
 var request = require('request');
-
-const TorrentNameParser = require('torrent-name-parse');
-const parser = new TorrentNameParser();
+var reqPromise = require('request-promise-native');
 
 const imdb = require('imdb-api');
-const tv = require('tvdb.js')('7578D990905EA100');
 
 var PORT = process.env.PORT || 7001;
 
@@ -135,16 +132,27 @@ app.get('/latestEpisode', (req, res, next) => {
   var show = req.query.show;
 
   var key = ('/latestEpisode/' + show);
+  var isCached = false;
   if (key in cache.pb) {
-    res.send(cache.pb[key]);
+    isCached = true;
+    res.json(cache.pb[key]);
   }
 
-  imdb.get(show).then(function(data) {
+  var torrentData = {};
+  var loadShow = function(show) {
+    return imdb.get(show).then(function(data) {
+      torrentData['title'] = data['title'];
+      torrentData['runtime'] = data['runtime'];
+      torrentData['poster'] = data['poster'];
+      return data['imdbid'];
+    });
+  };
 
-    var url = "https://tv-v2.api-fetch.website/show/" + data.imdbid;
-    request(url, function(error, response, body) {
-
-      body = JSON.parse(body);
+  var url = 'https://tv-v2.api-fetch.website/show/';
+  var loadEpisode = function(imbdid) {
+    url = url + imbdid;
+    return reqPromise(url).then(function(data) {
+      body = JSON.parse(data);
 
       // get episodes of the current or latest season.
       var num_seasons = body.num_seasons;
@@ -165,42 +173,34 @@ app.get('/latestEpisode', (req, res, next) => {
         }
       }
 
-      var magnetLink = currSeason[index].torrents['0']['url'];
+      var latestEp = currSeason[index];
+      torrentData['magnetLink'] = latestEp.torrents['0']['url'];
+      var airedDate = new Date();
+      airedDate.setTime(latestEp['first_aired'] * 1000);
+      torrentData['first_aired'] = airedDate.toDateString();
+      torrentData['overview'] = latestEp['overview'];
+      torrentData['ep_title'] = latestEp['title'];
+      torrentData['episode'] = latestEp['episode'];
+      torrentData['season'] = latestEp['season'];
 
-      var torrentData = {};
-      torrentData['magnetLink'] = magnetLink;
-
-      cache.pb[key] = torrentData; // Update the cached entry.
-      res.send(torrentData); // Send the JSON blob.
+      return body;
     });
+  }
 
-  }).catch(err => {
-    if (!err || !err.message) {
-      error = new Error('Unknown error occurred');
+  reportProblems = function(fault) {
+    console.error(fault);
+    res.status(404).json({
+      error: fault
+    });
+  };
+
+  loadShow(show).then(loadEpisode).then(function(body) {
+    cache.pb[key] = torrentData; // Update the cached entry.
+    // Can't send data twice
+    if (!isCached) {
+      res.json(torrentData); // Send the JSON blob.
     }
-    console.error(err);
-    res.send({
-      error: err.message
-    })
-  });
-
-  // PirateBay.search(show, {}).then(results => {
-  //   var name = results[0]['name'];
-  //
-  //   var torrentData = parser.parse(name);
-  //   torrentData['magnetLink']=results[0]['magnetLink'];
-  //
-  //   cache.pb[key] = torrentData;  // Update the cached entry.
-  //   res.send(torrentData);  // Send the JSON blob.
-  // }).catch(err => {
-  //   if (!err || !err.message) {
-  //     error = new Error('Unknown error occurred');
-  //   }
-  //   console.error(err);
-  //   res.send({
-  //     error: err.message
-  //   })
-  // });
+  }).catch(reportProblems);
 
 })
 
