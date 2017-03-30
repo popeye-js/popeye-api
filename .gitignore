@@ -3,6 +3,7 @@
 .config/
 .travis.config.tgz
 _build/
+.vscode/
 _prod/
 node_modules/
 npm-debug*.log*
