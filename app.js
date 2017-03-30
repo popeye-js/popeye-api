@@ -100,10 +100,10 @@ app.get('/movie', (req, res, next) => {
     res.send(cache.pb[key]);
   };
 
-  imdb.get(name).then(function(data) {
+  imdb.get(name).then(function (data) {
 
     var url = "https://tv-v2.api-fetch.website/movie/" + data.imdbid;
-    request(url, function(error, response, body) {
+    request(url, function (error, response, body) {
 
       body = JSON.parse(body);
 
@@ -139,8 +139,8 @@ app.get('/latestEpisode', (req, res, next) => {
   }
 
   var torrentData = {};
-  var loadShow = function(show) {
-    return imdb.get(show).then(function(data) {
+  var loadShow = function (show) {
+    return imdb.get(show).then(function (data) {
       torrentData['title'] = data['title'];
       torrentData['runtime'] = data['runtime'];
       torrentData['poster'] = data['poster'];
@@ -149,15 +149,15 @@ app.get('/latestEpisode', (req, res, next) => {
   };
 
   var url = 'https://tv-v2.api-fetch.website/show/';
-  var loadEpisode = function(imbdid) {
+  var loadEpisode = function (imbdid) {
     url = url + imbdid;
-    return reqPromise(url).then(function(data) {
+    return reqPromise(url).then(function (data) {
       body = JSON.parse(data);
 
       // get episodes of the current or latest season.
       var num_seasons = body.num_seasons;
       var currSeason = [];
-      body.episodes.forEach(function(episode) {
+      body.episodes.forEach(function (episode) {
         if (episode.season == num_seasons) {
           currSeason.push(episode);
         }
@@ -187,14 +187,14 @@ app.get('/latestEpisode', (req, res, next) => {
     });
   }
 
-  reportProblems = function(fault) {
+  reportProblems = function (fault) {
     console.error(fault);
     res.status(404).json({
       error: fault
     });
   };
 
-  loadShow(show).then(loadEpisode).then(function(body) {
+  loadShow(show).then(loadEpisode).then(function (body) {
     cache.pb[key] = torrentData; // Update the cached entry.
     // Can't send data twice
     if (!isCached) {
@@ -203,6 +203,52 @@ app.get('/latestEpisode', (req, res, next) => {
   }).catch(reportProblems);
 
 })
+
+var putioURIs = {
+  redirect: 'http://localhost:7001/putio/authenticate/callback',
+  access_token: 'https://api.put.io/v2/oauth2/access_token'
+};
+
+var appURIs = {
+  main: 'http://localhost:7000'
+}
+
+app.get('/putio/authenticate', (req, res, next) => {
+  var client_id = '2801';
+  var response_type = 'code';
+
+  var authenticateURL = `https://api.put.io/v2/oauth2/authenticate?client_id=${client_id}&response_type=${response_type}&redirect_uri=${putioURIs.redirect}`;
+  res.redirect(authenticateURL);
+});
+
+app.get('/putio/authenticate/callback', (req, res, next) => {
+  var options = {
+    uri: putioURIs.access_token,
+    qs: {
+      client_id: '2801',
+      client_secret: 'RNBYMVGCQE357PWIHN33',
+      grant_type: 'authorization_code',
+      // the uri must match the registerd uri in put.io
+      redirect_uri: putioURIs.redirect,
+      code: req.query.code,
+    },
+    headers: {
+      'User-Agent': 'Request-Promise'
+    },
+    json: true // Automatically parses the JSON string in the response 
+  };
+
+  reqPromise(options)
+    .then(function (result) {
+      // Conisder CSRF related middleware for express 
+      res.cookie('access_token', result.access_token );
+      res.redirect(appURIs.main);
+    })
+    .catch(function (err) {
+      // API call failed... 
+    });
+
+});
 
 app.listen(PORT, () => {
   console.log('Listening on port %s', PORT);
