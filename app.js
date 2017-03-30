@@ -205,7 +205,7 @@ app.get('/latestEpisode', (req, res, next) => {
 })
 
 var putioURIs = {
-  redirect: 'https://popeye-api.herokuapp.com/putio/authenticate/callback',
+  redirect: 'https://popeye-api.herokuapp.com/putio/authenticate/redirect',
   access_token: 'https://api.put.io/v2/oauth2/access_token'
 };
 
@@ -221,7 +221,7 @@ app.get('/putio/authenticate', (req, res, next) => {
   res.redirect(authenticateURL);
 });
 
-app.get('/putio/authenticate/callback', (req, res, next) => {
+app.get('/putio/authenticate/redirect', (req, res, next) => {
   var options = {
     uri: putioURIs.access_token,
     qs: {
