@@ -205,7 +205,7 @@ app.get('/latestEpisode', (req, res, next) => {
 })
 
 var putioURIs = {
-  redirect: 'http://localhost:7001/putio/authenticate/callback',
+  redirect: 'https://popeye-api.herokuapp.com/putio/authenticate/callback',
   access_token: 'https://api.put.io/v2/oauth2/access_token'
 };
 
