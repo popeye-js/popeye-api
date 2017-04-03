@@ -206,18 +206,26 @@ app.get('/latestEpisode', (req, res, next) => {
 
 var putioURIs = {
   redirect: 'https://popeye-api.herokuapp.com/putio/authenticate/redirect',
-  access_token: 'https://api.put.io/v2/oauth2/access_token'
+  access_token: 'https://api.put.io/v2/oauth2/access_token',
+  authenticate: 'https://api.put.io/v2/oauth2/authenticate'
 };
 
 var appURIs = {
-  main: 'http://localhost:7000'
+  main: ''
 }
+if ( app.get('env') === 'development' ) {
+    appURIs.main = 'http://localhost:7000';
+}
+else {
+  appURIs.main = 'https://popeye-js.github.io/';
+}
+
 
 app.get('/putio/authenticate', (req, res, next) => {
   var client_id = '2801';
   var response_type = 'code';
 
-  var authenticateURL = `https://api.put.io/v2/oauth2/authenticate?client_id=${client_id}&response_type=${response_type}&redirect_uri=${putioURIs.redirect}`;
+  var authenticateURL = `${putioURIs.authenticate}?client_id=${client_id}&response_type=${response_type}&redirect_uri=${putioURIs.redirect}`;
   res.redirect(authenticateURL);
 });
 
