@@ -211,15 +211,13 @@ var putioURIs = {
 };
 
 var appURIs = {
-  main: ''
-}
-if ( app.get('env') === 'development' ) {
-    appURIs.main = 'http://localhost:7000';
-}
-else {
-  appURIs.main = 'https://popeye-js.github.io/';
+  main: 'https://popeye-js.github.io/'
 }
 
+if ( app.get('env') === 'development' ) {
+    appURIs.main = 'http://localhost:7000';
+    // putioURIs.redirect = 'http://localhost:7001' +'/putio/authenticate/redirect';
+}
 
 app.get('/putio/authenticate', (req, res, next) => {
   var client_id = '2801';
@@ -230,6 +228,7 @@ app.get('/putio/authenticate', (req, res, next) => {
 });
 
 app.get('/putio/authenticate/redirect', (req, res, next) => {
+
   var options = {
     uri: putioURIs.access_token,
     qs: {
