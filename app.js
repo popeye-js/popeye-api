@@ -1,21 +1,65 @@
-var bodyParser = require('body-parser');
-var express = require('express');
-var cors = require("cors");
-var PirateBay = require('thepiratebay');
-
-var request = require('request');
-var reqPromise = require('request-promise-native');
-
+const PirateBay = require('thepiratebay');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const express = require('express');
 const imdb = require('imdb-api');
+const reqPromise = require('request-promise-native');
+const request = require('request');
 
-var PORT = process.env.PORT || 7001;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const IS_PROD = NODE_ENV === 'production';
+
+if (IS_PROD) {
+  process.env.SERVER_USE_HTTPS = process.env.SERVER_USE_HTTPS || 'true';
+  process.env.CLIENT_USE_HTTPS = process.env.CLIENT_USE_HTTPS || 'true';
+  process.env.CLIENT_HOST = process.env.CLIENT_HOST || 'popeye-api.herokuapp.com';
+  process.env.CLIENT_PORT = process.env.CLIENT_PORT || '';
+}
+
+const SERVER_USE_HTTPS = (process.env.SERVER_USE_HTTPS || '').toString === 'true';
+const SERVER_PROTOCOL = SERVER_USE_HTTPS ? 'https:' : 'http:';
+const SERVER_HOST = process.env.SERVER_HOST || process.env.HOST || '0.0.0.0';
+const SERVER_PORT = process.env.SERVER_PORT || process.env.PORT || 7001;
+
+const CLIENT_USE_HTTPS = (process.env.CLIENT_USE_HTTPS || '').toString === 'true';
+const CLIENT_PROTOCOL = CLIENT_USE_HTTPS ? 'https:' : 'http:';
+const CLIENT_HOST = process.env.CLIENT_HOST || process.env.HOST || '0.0.0.0';
+const CLIENT_PORT = process.env.CLIENT_PORT || process.env.PORT || 7000;
+
+let URLS = {
+  client: {
+  },
+  server: {
+  },
+  putio: {
+    base: 'https://api.put.io/v2'
+  }
+};
+
+URLS.client.base = IS_PROD ? `${CLIENT_PROTOCOL}//${CLIENT_HOST}` : `${CLIENT_PROTOCOL}//${CLIENT_HOST}`;
+// NOTE: We set `CLIENT_PORT` so it will the client base URL will be `http://0.0.0.0:7000`, for example.
+if (CLIENT_PORT) {
+  URLS.client.base += `:${CLIENT_PORT}`;
+}
+
+URLS.server.base = IS_PROD ? `${SERVER_PROTOCOL}//${SERVER_HOST}` : `${SERVER_PROTOCOL}//${SERVER_HOST}`;
+// NOTE: We don't need to set `SERVER_PORT` for production, since the URL will be `https://`.
+
+URLS.putio.redirect = `${URLS.server.base}/putio/authenticate/redirect`;
+URLS.putio.oauthBase = `${URLS.putio.base}/oauth2`;
+URLS.putio.accessToken = `${URLS.putio.oauthBase}/access_token`;
+URLS.putio.authenticate = `${URLS.putio.oauthBase}/authenticate?client_id=2801&response_type=code&redirect_uri=${URLS.putio.redirect}`;
+
+URLS.fetchMovie = imdbid => `https://tv-v2.api-fetch.website/movie/${imdbid}`;
+URLS.fetchTVEpisode = imdbid => `https://tv-v2.api-fetch.website/show/${imdbid}`;
 
 var app = express();
+
 app.use(bodyParser.urlencoded({
   extended: true
 }));
 app.use(bodyParser.json());
-app.use(cors()); // cors enablement for all routes
+app.use(cors());  // Enable CORS headers on responses for all routes.
 
 app.get('*', (req, res, next) => {
   console.log('[GET]', req.url, req.body, req.query);
@@ -35,18 +79,17 @@ var db = {
   requests: []
 };
 
-app.get('/', (req, res, next) => {
+app.get('/', (req, res) => {
   res.send({
     status: 'ok'
   });
 });
 
-app.get('/requests', (req, res, next) => {
+app.get('/requests', (req, res) => {
   res.send(db.requests);
-
 });
 
-app.post('/requests', (req, res, next) => {
+app.post('/requests', (req, res) => {
   if (req.body) {
     db.requests.push(req.body);
     res.send({
@@ -59,7 +102,7 @@ app.post('/requests', (req, res, next) => {
   });
 });
 
-app.delete('/requests', (req, res, next) => {
+app.delete('/requests', (req, res) => {
   db.requests = [];
   res.send({
     success: true
@@ -83,12 +126,14 @@ app.get('/torrents', (req, res, next) => {
     res.send(results); // Send the JSON blob.
   }).catch(err => {
     if (!err || !err.message) {
-      error = new Error('Unknown error occurred');
+      err = new Error('Unknown error occurred fetching torrents');
     }
+
     console.error(err);
-    res.send({
+
+    res.status(400).send({
       error: err.message
-    })
+    });
   });
 });
 
@@ -98,27 +143,31 @@ app.get('/movie', (req, res, next) => {
   var key = '/movie/' + name;
   if (key in cache.pb) {
     res.send(cache.pb[key]);
-  };
+  }
 
-  imdb.get(name).then(function (data) {
+  imdb.get(name).then(data => {
+    const url = URLS.fetchMovie(data.imdbid);
 
-    var url = "https://tv-v2.api-fetch.website/movie/" + data.imdbid;
-    request(url, function (error, response, body) {
+    request(url, (err, res, body) => {
+      if (err) {
+        throw err;
+      }
 
       body = JSON.parse(body);
 
-      var magnetLink = body.torrents.en['720p']['url'];
+      const magnetLink = body.torrents.en['720p'].url;
 
-      var torrentData = {};
-      torrentData['magnetLink'] = magnetLink;
+      let torrentData = {
+        magnetLink: magnetLink
+      };
 
-      cache.pb[key] = torrentData; // Update the cached entry.
-      res.send(torrentData); // Send the JSON blob.
+      cache.pb[key] = torrentData;  // Update the cached entry.
+      res.send(torrentData);  // Send the JSON blob.
     });
 
   }).catch(err => {
     if (!err || !err.message) {
-      error = new Error('Unknown error occurred while fetching movie');
+      err = new Error('Unknown error occurred while fetching movie');
     }
     console.error(err);
     res.send({
@@ -131,28 +180,29 @@ app.get('/movie', (req, res, next) => {
 app.get('/latestEpisode', (req, res, next) => {
   var show = req.query.show;
 
-  var key = ('/latestEpisode/' + show);
+  var key = '/latestEpisode/' + show;
   var isCached = false;
   if (key in cache.pb) {
     isCached = true;
     res.json(cache.pb[key]);
   }
 
-  var torrentData = {};
-  var loadShow = function (show) {
-    return imdb.get(show).then(function (data) {
-      torrentData['title'] = data['title'];
-      torrentData['runtime'] = data['runtime'];
-      torrentData['poster'] = data['poster'];
-      return data['imdbid'];
+  let torrentData = {};
+
+  var loadShow = show => {
+    return imdb.get(show).then(data => {
+      torrentData.title = data.title;
+      torrentData.runtime = data.runtime;
+      torrentData.poster = data.poster;
+      return data.imdbid;
     });
   };
 
-  var url = 'https://tv-v2.api-fetch.website/show/';
-  var loadEpisode = function (imbdid) {
-    url = url + imbdid;
-    return reqPromise(url).then(function (data) {
-      body = JSON.parse(data);
+  const loadEpisode = imbdid => {
+    const url = URLS.fetchTVEpisode(imbdid);
+
+    return reqPromise(url).then(body => {
+      body = JSON.parse(body);
 
       // get episodes of the current or latest season.
       var num_seasons = body.num_seasons;
@@ -167,97 +217,82 @@ app.get('/latestEpisode', (req, res, next) => {
       var highestEp = 0;
       var index = 0;
       for (var i = 0; i < currSeason.length; i++) {
-        if (currSeason[i]['episode'] > highestEp) {
-          highestEp = currSeason[i]['episode'];
+        if (currSeason[i].episode > highestEp) {
+          highestEp = currSeason[i].episode;
           index = i;
         }
       }
 
       var latestEp = currSeason[index];
-      torrentData['magnetLink'] = latestEp.torrents['0']['url'];
+      torrentData.magnetLink = latestEp.torrents['0'].url;
       var airedDate = new Date();
-      airedDate.setTime(latestEp['first_aired'] * 1000);
-      torrentData['first_aired'] = airedDate.toDateString();
-      torrentData['overview'] = latestEp['overview'];
-      torrentData['ep_title'] = latestEp['title'];
-      torrentData['episode'] = latestEp['episode'];
-      torrentData['season'] = latestEp['season'];
+      airedDate.setTime(latestEp.first_aired * 1000);
+      torrentData.first_aired = airedDate.toDateString();
+      torrentData.overview = latestEp.overview;
+      torrentData.ep_title = latestEp.title;
+      torrentData.episode = latestEp.episode;
+      torrentData.season = latestEp.season;
 
       return body;
     });
-  }
+  };
 
-  reportProblems = function (fault) {
-    console.error(fault);
-    res.status(404).json({
-      error: fault
+  var handleErrors = err => {
+    if (!err || !err.message) {
+      err = new Error('Unknown error occurred while fetching TV episode');
+    }
+
+    console.error(err);
+
+    res.status(400).json({
+      error: err.message
     });
   };
 
-  loadShow(show).then(loadEpisode).then(function (body) {
-    cache.pb[key] = torrentData; // Update the cached entry.
-    // Can't send data twice
+  loadShow(show).then(loadEpisode).then(body => {
+    cache.pb[key] = torrentData;  // Update the cached entry.
+    // Can't send the data twice.
     if (!isCached) {
-      res.json(torrentData); // Send the JSON blob.
+      res.json(torrentData);  // Send the JSON blob.
     }
-  }).catch(reportProblems);
+  }).catch(handleErrors);
+});
 
-})
-
-var putioURIs = {
-  redirect: 'https://popeye-api.herokuapp.com/putio/authenticate/redirect',
-  access_token: 'https://api.put.io/v2/oauth2/access_token',
-  authenticate: 'https://api.put.io/v2/oauth2/authenticate'
-};
-
-var appURIs = {
-  main: 'https://popeye-js.github.io/',
-  domain: 'popeye-js.github.io'
-}
-
-if ( app.get('env') === 'development' ) {
-    appURIs.main = 'http://localhost:7000';
-    // putioURIs.redirect = 'http://localhost:7001' +'/putio/authenticate/redirect';
-}
-
-app.get('/putio/authenticate', (req, res, next) => {
-  var client_id = '2801';
-  var response_type = 'code';
-
-  var authenticateURL = `${putioURIs.authenticate}?client_id=${client_id}&response_type=${response_type}&redirect_uri=${putioURIs.redirect}`;
-  res.redirect(authenticateURL);
+app.get('/putio/authenticate', (req, res) => {
+  res.redirect(URLS.putio.authenticate);
 });
 
 app.get('/putio/authenticate/redirect', (req, res, next) => {
 
   var options = {
-    uri: putioURIs.access_token,
+    uri: URLS.putio.access_token,
     qs: {
       client_id: '2801',
       client_secret: 'RNBYMVGCQE357PWIHN33',
       grant_type: 'authorization_code',
-      // the uri must match the registerd uri in put.io
-      redirect_uri: putioURIs.redirect,
-      code: req.query.code,
+      // The URI must match the registered URI in Put.io's API Developer settings.
+      redirect_uri: URLS.putio.redirect,
+      code: req.query.code
     },
     headers: {
       'User-Agent': 'Request-Promise'
     },
-    json: true // Automatically parses the JSON string in the response 
+    json: true  // Automatically parse the JSON string in the response.
   };
 
   reqPromise(options)
-    .then(function (result) {
-      // Conisder CSRF related middleware for express 
-      res.cookie('access_token', result.access_token, {domain: appURIs.domain} );
-      res.redirect(appURIs.main);
+    .then(result => {
+      // TODO: Use CSRF middleware for express.
+      // res.cookie('access_token', result.access_token);
+      res.redirect(URLS.client.base);
     })
-    .catch(function (err) {
-      // API call failed... 
+    .catch(err => {
+      // API call failed.
+      console.error(err);
     });
-
 });
 
-app.listen(PORT, () => {
-  console.log('Listening on port %s', PORT);
+app.listen(SERVER_PORT, '0.0.0.0', () => {
+  console.log('Listening on port %s//%s:%s',
+    SERVER_PROTOCOL, SERVER_HOST, SERVER_PORT);
 });
