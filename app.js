@@ -211,7 +211,8 @@ var putioURIs = {
 };
 
 var appURIs = {
-  main: 'https://popeye-js.github.io/'
+  main: 'https://popeye-js.github.io/',
+  domain: 'popeye-js.github.io'
 }
 
 if ( app.get('env') === 'development' ) {
@@ -248,7 +249,7 @@ app.get('/putio/authenticate/redirect', (req, res, next) => {
   reqPromise(options)
     .then(function (result) {
       // Conisder CSRF related middleware for express 
-      res.cookie('access_token', result.access_token );
+      res.cookie('access_token', result.access_token, {domain: appURIs.domain} );
       res.redirect(appURIs.main);
     })
     .catch(function (err) {
