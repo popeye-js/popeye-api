@@ -49,7 +49,7 @@ URLS.putio.redirect = `${URLS.server.base}/putio/authenticate/redirect`;
 URLS.putio.oauthBase = `${URLS.putio.base}/oauth2`;
 URLS.putio.accessToken = `${URLS.putio.oauthBase}/access_token`;
 URLS.putio.authenticate = `${URLS.putio.oauthBase}/authenticate?client_id=2801&response_type=code&redirect_uri=${URLS.putio.redirect}`;
-
+// popcorn time api 
 URLS.fetchMovie = imdbid => `https://tv-v2.api-fetch.website/movie/${imdbid}`;
 URLS.fetchTVEpisode = imdbid => `https://tv-v2.api-fetch.website/show/${imdbid}`;
 
@@ -145,35 +145,44 @@ app.get('/movie', (req, res, next) => {
     res.send(cache.pb[key]);
   }
 
-  imdb.get(name).then(data => {
-    const url = URLS.fetchMovie(data.imdbid);
-
-    request(url, (err, res, body) => {
-      if (err) {
-        throw err;
+  let torrentData = {};
+  var getMovieData = name => {
+    return imdb.get(name).then(data => {
+      if (data.type != 'movie') {
+        return new Error('Result is not a movie')
       }
+      torrentData.title = data.title;
+      torrentData.plot = data.plot;
+      torrentData.year = data.year;
+      torrentData.runtime = data.runtime;
+      torrentData.poster = data.poster;
+      return data.imdbid;
+    })
+  }
 
+  var loadMovie = imbdId => {
+    const url = URLS.fetchMovie(imbdId);
+    return reqPromise(url).then(body => {
       body = JSON.parse(body);
-
-      const magnetLink = body.torrents.en['720p'].url;
-
-      let torrentData = {
-        magnetLink: magnetLink
-      };
+      torrentData.magnetLink = body.torrents.en['720p'].url;
 
       cache.pb[key] = torrentData;  // Update the cached entry.
       res.send(torrentData);  // Send the JSON blob.
     });
+  };
 
-  }).catch(err => {
+  var handleErrors = err => {
     if (!err || !err.message) {
       err = new Error('Unknown error occurred while fetching movie');
     }
     console.error(err);
-    res.send({
+    res.status(400).json({
       error: err.message
     });
-  });
+  };
+
+  getMovieData(name).then(loadMovie).catch(handleErrors);
+
 });
 
 // Get the latest episode
